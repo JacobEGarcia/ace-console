@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ACE CONSOLE - Free AI Music Generation</title>
+<meta name="description" content="A free music generation console built on ACE-Step, the open-source MIT music model. Write a prompt, get a track. Runs free in your browser via Hugging Face ZeroGPU, or locally on your own machine.">
+<meta name="theme-color" content="#0a0a0b">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230a0a0b'/%3E%3Crect x='6' y='14' width='4' height='12' fill='%23ff3b1d'/%3E%3Crect x='14' y='6' width='4' height='20' fill='%23f2efe9'/%3E%3Crect x='22' y='10' width='4' height='16' fill='%23f2efe9'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a0a0b; --panel:#101012; --line:#242428; --line-soft:#1a1a1e;
+    --ink:#f2efe9; --ink-dim:#8f8c85; --ink-faint:#55534e;
+    --accent:#ff3b1d; --accent-soft:rgba(255,59,29,.12);
+    --ok:#3ddc84;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{background:var(--bg);color:var(--ink);font-family:'Archivo',system-ui,sans-serif;
+       -webkit-font-smoothing:antialiased;line-height:1.5}
+  ::selection{background:var(--accent);color:#fff}
+  .mono{font-family:'IBM Plex Mono',ui-monospace,monospace}
+  .wrap{max-width:1120px;margin:0 auto;padding:0 24px}
+
+  /* --- top bar --- */
+  header{position:sticky;top:0;z-index:50;background:rgba(10,10,11,.85);backdrop-filter:blur(12px);
+         border-bottom:1px solid var(--line-soft)}
+  .bar{display:flex;align-items:center;justify-content:space-between;height:56px}
+  .wordmark{display:flex;align-items:center;gap:12px;text-decoration:none;color:var(--ink)}
+  .eq{display:flex;align-items:flex-end;gap:2px;height:16px}
+  .eq i{display:block;width:3px;background:var(--ink)}
+  .eq i:nth-child(1){height:8px;background:var(--accent)}
+  .eq i:nth-child(2){height:16px}
+  .eq i:nth-child(3){height:12px}
+  .wordmark b{font-weight:800;font-size:14px;letter-spacing:.14em}
+  .wordmark span{font-size:11px;color:var(--ink-dim);letter-spacing:.1em}
+  .bar nav{display:flex;gap:26px}
+  .bar nav a{color:var(--ink-dim);text-decoration:none;font-size:11px;letter-spacing:.14em;text-transform:uppercase;transition:color .15s}
+  .bar nav a:hover{color:var(--ink)}
+  @media(max-width:700px){.bar nav{display:none}}
+
+  /* --- hero --- */
+  .hero{padding:96px 0 72px;border-bottom:1px solid var(--line-soft)}
+  .kicker{display:inline-flex;align-items:center;gap:8px;font-size:11px;letter-spacing:.18em;
+          color:var(--ink-dim);text-transform:uppercase;margin-bottom:28px}
+  .led{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok);
+       animation:pulse 2.4s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  h1{font-size:clamp(44px,7.5vw,88px);font-weight:800;line-height:.98;letter-spacing:-.02em;
+     text-transform:uppercase;max-width:14ch}
+  h1 em{font-style:normal;color:var(--accent)}
+  .hero p{margin-top:28px;max-width:52ch;color:var(--ink-dim);font-size:16px}
+  .hero p b{color:var(--ink);font-weight:600}
+  .hero-stats{display:flex;gap:0;margin-top:48px;border:1px solid var(--line);width:fit-content;flex-wrap:wrap}
+  .stat{padding:16px 28px;border-right:1px solid var(--line)}
+  .stat:last-child{border-right:0}
+  .stat b{display:block;font-size:20px;font-weight:800}
+  .stat span{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-faint)}
+
+  /* --- console --- */
+  section{padding:72px 0}
+  .sec-head{display:flex;align-items:baseline;justify-content:space-between;gap:16px;
+            border-bottom:1px solid var(--line);padding-bottom:14px;margin-bottom:32px;flex-wrap:wrap}
+  .sec-head h2{font-size:13px;font-weight:600;letter-spacing:.2em;text-transform:uppercase}
+  .sec-head .mono{font-size:11px;color:var(--ink-faint);letter-spacing:.08em}
+  .console{border:1px solid var(--line);background:var(--panel)}
+  .console-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;
+               padding:10px 16px;border-bottom:1px solid var(--line)}
+  .console-bar .dots{display:flex;gap:6px}
+  .console-bar .dots i{width:9px;height:9px;border-radius:50%;background:var(--line)}
+  .console-bar .dots i:first-child{background:var(--accent)}
+  .console-bar .addr{flex:1;font-size:11px;color:var(--ink-faint);letter-spacing:.04em;
+                     overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .console-bar a{color:var(--ink-dim);font-size:10px;letter-spacing:.12em;text-transform:uppercase;
+                 text-decoration:none;border:1px solid var(--line);padding:5px 10px;transition:.15s;white-space:nowrap}
+  .console-bar a:hover{border-color:var(--ink-dim);color:var(--ink)}
+  .console iframe{display:block;width:100%;height:960px;border:0;background:#fff}
+  .console-note{display:flex;gap:10px;padding:14px 16px;border-top:1px solid var(--line);
+                font-size:12px;color:var(--ink-dim)}
+  .console-note .mono{color:var(--accent);font-size:11px}
+
+  /* --- steps --- */
+  .steps{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--line)}
+  .step{padding:28px;border-right:1px solid var(--line)}
+  .step:last-child{border-right:0}
+  .step .num{font-size:11px;color:var(--accent);letter-spacing:.2em;margin-bottom:14px}
+  .step h3{font-size:16px;font-weight:600;margin-bottom:8px}
+  .step p{font-size:13px;color:var(--ink-dim)}
+  .step p a{color:var(--ink);border-bottom:1px solid var(--accent);text-decoration:none}
+  @media(max-width:760px){.steps{grid-template-columns:1fr}.step{border-right:0;border-bottom:1px solid var(--line)}.step:last-child{border-bottom:0}}
+
+  /* --- prompt library --- */
+  .lib{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}
+  .card{border:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;transition:border-color .15s}
+  .card:hover{border-color:#3a3a40}
+  .card-top{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line-soft)}
+  .lane{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent)}
+  .card h3{font-size:15px;font-weight:600}
+  .card-body{padding:16px 18px;flex:1}
+  .card .prompt{font-size:12px;color:var(--ink-dim);line-height:1.7}
+  .card-foot{display:flex;border-top:1px solid var(--line-soft)}
+  .card-foot button{flex:1;background:none;border:0;border-right:1px solid var(--line-soft);
+                    color:var(--ink-dim);font-family:'IBM Plex Mono',monospace;font-size:11px;
+                    letter-spacing:.1em;text-transform:uppercase;padding:12px;cursor:pointer;transition:.15s}
+  .card-foot button:last-child{border-right:0}
+  .card-foot button:hover{background:var(--accent-soft);color:var(--accent)}
+  .card-foot button.copied{color:var(--ok)}
+
+  /* --- run local --- */
+  .local{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:760px){.local{grid-template-columns:1fr}}
+  .term{border:1px solid var(--line);background:#000}
+  .term-bar{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--line-soft)}
+  .term-bar span{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-faint)}
+  .term-bar button{background:none;border:0;color:var(--ink-faint);font-family:'IBM Plex Mono',monospace;
+                   font-size:10px;letter-spacing:.1em;text-transform:uppercase;cursor:pointer}
+  .term-bar button:hover{color:var(--accent)}
+  .term pre{padding:18px;font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.9;
+            color:#c9c6bf;overflow-x:auto}
+  .term pre .c{color:var(--ink-faint)}
+  .term pre .p{color:var(--accent)}
+  .local-copy p{font-size:14px;color:var(--ink-dim);margin-bottom:18px;max-width:46ch}
+  .local-copy p b{color:var(--ink);font-weight:600}
+  .spec{display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--line-soft);font-size:13px}
+  .spec span{color:var(--ink-faint)} .spec b{font-weight:600}
+  .spec a{color:var(--ink);border-bottom:1px solid var(--accent);text-decoration:none}
+
+  /* --- sample --- */
+  .sample{border:1px solid var(--line);background:var(--panel);padding:28px}
+  .sample-top{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:20px}
+  .sample h3{font-size:18px;font-weight:800;text-transform:uppercase;letter-spacing:.02em}
+  .sample h3 em{font-style:normal;color:var(--accent)}
+  .sample .mono{font-size:11px;color:var(--ink-faint)}
+  .sample audio{width:100%;height:44px;display:block}
+  audio::-webkit-media-controls-panel{background:var(--line-soft)}
+
+  /* --- footer --- */
+  footer{border-top:1px solid var(--line-soft);padding:40px 0 56px}
+  .foot{display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap}
+  .foot small{color:var(--ink-faint);font-size:11px;line-height:1.8;max-width:44ch}
+  .foot .links{display:flex;gap:22px}
+  .foot .links a{color:var(--ink-dim);font-size:11px;letter-spacing:.12em;text-transform:uppercase;text-decoration:none}
+  .foot .links a:hover{color:var(--accent)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap bar">
+    <a class="wordmark" href="#top">
+      <span class="eq"><i></i><i></i><i></i></span>
+      <b>ACE CONSOLE</b>
+      <span class="mono">v1.5</span>
+    </a>
+    <nav>
+      <a href="#console">Console</a>
+      <a href="#prompts">Prompts</a>
+      <a href="#local">Run local</a>
+      <a href="#sample">Sample</a>
+    </nav>
+  </div>
+</header>
+
+<div id="top"></div>
+
+<section class="hero">
+  <div class="wrap">
+    <div class="kicker"><span class="led"></span> LIVE - ACE-STEP · OPEN-SOURCE MUSIC MODEL · MIT LICENSE</div>
+    <h1>Type it.<br><em>Hear it.</em><br>Keep it.</h1>
+    <p>A free console for <b>ACE-Step</b>, the open-source music generation model. Describe a track in plain words, get back a finished song - vocals, instruments, mastering and all. No subscription, no credits to buy, and the output is <b>yours to use commercially</b>. The generator runs below, in this page, on free GPU time.</p>
+    <div class="hero-stats">
+      <div class="stat"><b>MIT</b><span>License</span></div>
+      <div class="stat"><b>$0</b><span>To generate</span></div>
+      <div class="stat"><b>50+</b><span>Languages</span></div>
+      <div class="stat"><b>4 GB</b><span>VRAM to run local</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="console">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2>The Console</h2>
+      <span class="mono">ACE-STEP v1.5 - SERVED LIVE VIA HUGGING FACE ZERO-GPU</span>
+    </div>
+    <div class="console">
+      <div class="console-bar">
+        <span class="dots"><i></i><i></i><i></i></span>
+        <span class="addr mono">ace-step-ace-step-v1-5.hf.space</span>
+        <a href="https://huggingface.co/spaces/ACE-Step/Ace-Step-v1.5" target="_blank" rel="noopener">Open full screen</a>
+      </div>
+      <iframe src="https://ace-step-ace-step-v1-5.hf.space" title="ACE-Step music generator" loading="lazy" allow="clipboard-read; clipboard-write; microphone"></iframe>
+      <div class="console-note">
+        <span class="mono">NOTE</span>
+        <span>Generation runs on Hugging Face's free ZeroGPU tier. Sign in with a free Hugging Face account (top right of the console) for a daily GPU quota. When the day's quota runs out, the local install below has no limits at all.</span>
+      </div>
+    </div>
+    <div class="steps" style="margin-top:32px">
+      <div class="step">
+        <div class="num mono">01</div>
+        <h3>Describe the track</h3>
+        <p>Genres, instruments, mood, BPM. Or paste one of the prompts from the library below.</p>
+      </div>
+      <div class="step">
+        <div class="num mono">02</div>
+        <h3>Add lyrics, or don't</h3>
+        <p>Write lyrics with [verse] / [chorus] tags, or use [inst] for a pure instrumental.</p>
+      </div>
+      <div class="step">
+        <div class="num mono">03</div>
+        <h3>Generate and download</h3>
+        <p>The turbo model renders in seconds. Download the WAV - it's yours, commercially.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="prompts">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2>Prompt Library</h2>
+      <span class="mono">COPY → PASTE INTO THE CONSOLE</span>
+    </div>
+    <div class="lib" id="lib"></div>
+  </div>
+</section>
+
+<section id="local">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2>Run It Local - No Quota, Ever</h2>
+      <span class="mono">MAC · WINDOWS · LINUX</span>
+    </div>
+    <div class="local">
+      <div class="local-copy">
+        <p>The whole model is open. On a MacBook it runs on Apple Silicon through MLX; on a GPU box it needs <b>under 4 GB of VRAM</b>. First run downloads the weights, then everything happens on your machine - no quota, no queue, no account.</p>
+        <div class="spec"><span>Model</span><b>ACE-Step v1.5 (turbo / base / sft)</b></div>
+        <div class="spec"><span>Speed</span><b>~seconds per track on a modern GPU</b></div>
+        <div class="spec"><span>Mac</span><b>Apple Silicon, MLX backend</b></div>
+        <div class="spec"><span>License</span><b>MIT - commercial use allowed</b></div>
+        <div class="spec"><span>Source</span><b><a href="https://github.com/ace-step/ACE-Step-1.5" target="_blank" rel="noopener">github.com/ace-step/ACE-Step-1.5</a></b></div>
+      </div>
+      <div class="term">
+        <div class="term-bar"><span>terminal - local install</span><button id="copy-install">Copy</button></div>
+        <pre id="install-cmd"><span class="c"># one-time install (needs Python 3.11–3.12)</span>
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+git clone https://github.com/ACE-Step/ACE-Step-1.5.git
+cd ACE-Step-1.5
+uv sync
+
+<span class="c"># launch the console on your own machine</span>
+<span class="p">uv run acestep</span>   <span class="c"># → http://localhost:7860</span></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="sample">
+  <div class="wrap">
+    <div class="sec-head">
+      <h2>Made Here</h2>
+      <span class="mono">RENDERED WITH ACE-STEP - UNEDITED OUTPUT</span>
+    </div>
+    <div class="sample">
+      <div class="sample-top">
+        <h3>Recovered Signal <em>/</em> analog horror score</h3>
+        <span class="mono" id="sample-meta">ACE-STEP · DARK AMBIENT · INSTRUMENTAL</span>
+      </div>
+      <audio controls preload="none" src="sample.mp3"></audio>
+      <p class="mono" style="margin-top:16px;font-size:11px;color:var(--ink-faint)">PROMPT - dark ambient horror soundtrack, detuned piano, tape hiss, distant drones, analog horror VHS atmosphere, slow, unsettling, instrumental</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot">
+    <small>ACE CONSOLE is a front-end for ACE-Step by ACE Studio / StepFun. Model and weights are MIT-licensed; generated music may be used commercially. Not affiliated with ACE Studio. Generation hardware is Hugging Face's free ZeroGPU tier.</small>
+    <div class="links">
+      <a href="https://huggingface.co/ACE-Step/Ace-Step1.5" target="_blank" rel="noopener">Model</a>
+      <a href="https://huggingface.co/spaces/ACE-Step/Ace-Step-v1.5" target="_blank" rel="noopener">Space</a>
+      <a href="https://github.com/ace-step/ACE-Step-1.5" target="_blank" rel="noopener">Source</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+const PROMPTS = [
+  {lane:"Analog horror", title:"Recovered Signal", prompt:"dark ambient horror soundtrack, detuned piano, tape hiss, distant drones, analog horror VHS atmosphere, slow, unsettling, 60 BPM, instrumental"},
+  {lane:"Analog horror", title:"Broadcast Intrusion", prompt:"eerie analog horror score, broken music box, shortwave radio interference, sub-bass swells, emergency broadcast tension, dissonant strings, instrumental"},
+  {lane:"E/ACC", title:"Escape Velocity", prompt:"euphoric synthwave anthem, driving arpeggios, huge analog pads, 128 BPM, triumphant, acceleration, retro-futuristic, sidechained bass"},
+  {lane:"E/ACC", title:"Singularity Hymn", prompt:"epic orchestral electronic hybrid, soaring choir, pulsating synth bass, cinematic drums, 140 BPM, hopeful, transcendent, build to massive drop"},
+  {lane:"Night drive", title:"Lake Shore 3AM", prompt:"chill synthwave night drive, warm rhodes chords, soft 808, mellow lead synth, 92 BPM, nostalgic, neon city, rain on windshield, instrumental"},
+  {lane:"Game OST", title:"Dungeon Crawl", prompt:"16-bit chiptune RPG dungeon theme, mysterious, echoing square waves, minor key, 100 BPM, snes soundchip, loopable, instrumental"},
+  {lane:"Game OST", title:"Boss Rush", prompt:"intense chiptune boss battle theme, fast arpeggios, driving drums, aggressive square lead, 160 BPM, urgent, 16-bit, instrumental"},
+  {lane:"Focus", title:"Deep Work", prompt:"minimal ambient focus music, soft piano, warm tape saturation, gentle pads, 70 BPM, calm, no percussion, brian eno style, instrumental"},
+  {lane:"Shoegaze", title:"Static Bloom", prompt:"dreamy shoegaze, wall of distorted guitars, ethereal female vocals, slow heavy drums, 85 BPM, melancholic, reverb drenched, my bloody valentine style"},
+  {lane:"Hip-hop", title:"Blueprint", prompt:"boom bap hip hop beat, dusty vinyl sample, chopped soul piano, hard knocking drums, 90 BPM, confident, head-nod groove, instrumental"},
+  {lane:"Folk", title:"North Field", prompt:"intimate acoustic folk, fingerpicked guitar, soft male vocals, subtle cello, 76 BPM, bittersweet, autumn, campfire warmth"},
+  {lane:"Techno", title:"Warehouse", prompt:"dark driving techno, pounding kick, hypnotic acid line, industrial textures, 132 BPM, relentless, berlin warehouse, instrumental"}
+];
+const lib = document.getElementById('lib');
+PROMPTS.forEach(p => {
+  const el = document.createElement('div');
+  el.className = 'card';
+  el.innerHTML = `
+    <div class="card-top"><span class="lane mono">${p.lane}</span><h3>${p.title}</h3></div>
+    <div class="card-body"><p class="prompt mono">${p.prompt}</p></div>
+    <div class="card-foot">
+      <button data-copy="${p.prompt.replace(/"/g,'&quot;')}">Copy prompt</button>
+      <button data-copy="[inst]">Copy [inst]</button>
+    </div>`;
+  lib.appendChild(el);
+});
+function wire(btn, after){
+  btn.addEventListener('click', async () => {
+    const text = btn.dataset.copy;
+    try { await navigator.clipboard.writeText(text); }
+    catch(e){
+      const ta = document.createElement('textarea');
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      document.execCommand('copy'); ta.remove();
+    }
+    const old = btn.textContent;
+    btn.textContent = 'Copied'; btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = old; btn.classList.remove('copied'); }, 1400);
+  });
+}
+document.querySelectorAll('[data-copy]').forEach(b => wire(b));
+const installBtn = document.getElementById('copy-install');
+installBtn.dataset.copy = `curl -LsSf https://astral.sh/uv/install.sh | sh
+git clone https://github.com/ACE-Step/ACE-Step-1.5.git
+cd ACE-Step-1.5
+uv sync
+uv run acestep`;
+wire(installBtn);
+</script>
+</body>
+</html>
